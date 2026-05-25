@@ -134,18 +134,27 @@ const shouldClearTerminalForFrame = ({
 
 	const hadPreviousFrame = previousOutputHeight > 0;
 	const wasFullscreen = previousOutputHeight >= viewportRows;
+	const wasOverflowing = previousOutputHeight > viewportRows;
 	const isOverflowing = nextOutputHeight > viewportRows;
+	const isShrinkingFromOverflow =
+		wasOverflowing && nextOutputHeight < previousOutputHeight;
 	const shouldClearOnUnmount = isUnmounting && wasFullscreen;
 
-	// Reasonix patch: removed `wasOverflowing` (sticky — once any frame
-	// overflowed, every subsequent frame triggered the clear-and-rewrite path,
-	// which yanks the viewport to the top on every streaming chunk) and
-	// `isLeavingFullscreen` (same root cause from the opposite direction).
-	// Only the current frame's overflow matters; once content shrinks back
-	// within viewport, the log-update path (with PR #917 cursor-up clamping)
-	// handles incremental updates cleanly without scrollback disruption.
+	// Reasonix patch:
+	// - Drop `wasOverflowing` as a standalone trigger — when true alone, it
+	//   was sticky across same-height frames, so every streaming chunk during
+	//   a fullscreen burst yanked the viewport to the top.
+	// - Drop `isLeavingFullscreen` — same root cause from the opposite
+	//   direction.
+	// - Keep the shrinking-from-overflow case (`isShrinkingFromOverflow`):
+	//   PR #917's cursor-up clamping bounds log-update to viewport height,
+	//   which means rows that scrolled above the viewport during overflow are
+	//   unreachable by incremental erase. One full clear-and-rewrite on the
+	//   shrink edge wipes those leftover rows; subsequent in-viewport frames
+	//   resume the cheap log-update path with no scroll-snap.
 	return (
 		(isOverflowing && hadPreviousFrame) ||
+		isShrinkingFromOverflow ||
 		shouldClearOnUnmount
 	);
 };
