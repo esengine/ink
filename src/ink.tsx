@@ -134,19 +134,18 @@ const shouldClearTerminalForFrame = ({
 
 	const hadPreviousFrame = previousOutputHeight > 0;
 	const wasFullscreen = previousOutputHeight >= viewportRows;
-	const wasOverflowing = previousOutputHeight > viewportRows;
 	const isOverflowing = nextOutputHeight > viewportRows;
-	const isLeavingFullscreen = wasFullscreen && nextOutputHeight < viewportRows;
 	const shouldClearOnUnmount = isUnmounting && wasFullscreen;
 
+	// Reasonix patch: removed `wasOverflowing` (sticky — once any frame
+	// overflowed, every subsequent frame triggered the clear-and-rewrite path,
+	// which yanks the viewport to the top on every streaming chunk) and
+	// `isLeavingFullscreen` (same root cause from the opposite direction).
+	// Only the current frame's overflow matters; once content shrinks back
+	// within viewport, the log-update path (with PR #917 cursor-up clamping)
+	// handles incremental updates cleanly without scrollback disruption.
 	return (
-		// Overflowing frames still need full clear fallback.
-		wasOverflowing ||
 		(isOverflowing && hadPreviousFrame) ||
-		// Clear when shrinking from fullscreen to non-fullscreen output.
-		isLeavingFullscreen ||
-		// Preserve legacy unmount behavior for fullscreen frames: final teardown
-		// render should clear once to avoid leaving a scrolled viewport state.
 		shouldClearOnUnmount
 	);
 };
